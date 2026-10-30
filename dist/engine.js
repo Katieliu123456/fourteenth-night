@@ -1,11 +1,13 @@
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./data.js'));
-  else root.Night14 = factory(root.Night14Data);
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (D) {
+  if (typeof module === 'object' && module.exports) { const d = require('./data.js'); module.exports = factory(d, require('./stories.js')(d)); }
+  else root.Night14 = factory(root.Night14Data, root.Night14Story);
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (D, Story) {
   'use strict';
   const VERSION = 1;
-  const freshFlags = () => ({ locker: false, pass: false, relay: false, rescued: false, power: false, public: false, consent: false });
-  function create(gender = 'female') { return { version: VERSION, started: true, gender: gender === 'male' ? 'male' : 'female', room: 'cabin', minute: 0, cycle: 1, xp: 0, known: [], deductions: [], rewarded: [], flags: freshFlags(), visits: ['cabin'], timeline: [], diary: [], log: ['你在永夜号醒来。当前时间 00:00。'], ending: null, endingsSeen: [] }; }
+  const freshFlags = () => ({ locker: false, pass: false, relay: false, rescued: false, power: false, public: false, consent: false, staffKey: false, guestPass: false, patientLink: false, captainSupport: false, radioSupport: false, louisEvac: false });
+  function create(gender = 'female') { return { version: VERSION, started: true, gender: gender === 'male' ? 'male' : 'female', room: 'cabin', minute: 0, cycle: 1, xp: 0, known: [], deductions: [], rewarded: [], flags: freshFlags(), visits: ['cabin'], timeline: [], diary: [], log: ['你在永夜号醒来。当前时间 00:00。'], ending: null, endingsSeen: [], choices: [], relations: {}, story: {} }; }
+  const assisted = s => s.flags.relay || s.flags.rescued || s.flags.captainSupport || s.flags.radioSupport;
+  const supportsDeduction = (s, d) => [d.ids, ...(d.alternatives || [])].some(ids => ids.every(id => has(s, id)));
   const copy = s => JSON.parse(JSON.stringify(s));
   const has = (s, id) => s.known.includes(id);
   const deduced = (s, id) => s.deductions.includes(id);
@@ -28,8 +30,8 @@
   }
   function gate(s, room) {
     if (!D.rooms[room]) return '这条路线不存在。';
-    if (room === 'clinic' && !(s.flags.locker || (s.minute >= 3 && s.minute < 11))) return '医务室在 00:03～00:10 接诊。你也可以在下一轮重开已解开的备用柜。';
-    if (room === 'bridge' && !has(s, 'hatch') && !s.flags.pass) return '驾驶室需要通行证。甲板的维修侧门也许有别的入口。';
+    if (room === 'clinic' && !(s.flags.locker || s.flags.staffKey || (s.minute >= 3 && s.minute < 11))) return '医务室在 00:03～00:10 接诊。也可向秦雾说明来意，取得诊疗通行条。';
+    if (room === 'bridge' && !has(s, 'hatch') && !s.flags.pass && !s.flags.guestPass) return '驾驶室需要通行证。甲板维修侧门与领班的临时通行都是可能的入口。';
     if (room === 'engine' && !(s.flags.locker || s.flags.pass)) return '机舱门锁着。需要医务室备用钥匙，或船长的通行证。';
     if (room === 'archive' && !s.flags.power) return '保存舱需要先恢复稳定配电。';
     if (room === 'archive' && !deduced(s, 'projection')) return '防护终端拒绝开门：请先查明驾驶室中“另一个自己”的身份。';
@@ -42,7 +44,7 @@
     if (!has(s, 'transfer')) m.push('核实一次性桥接方案');
     if (!s.flags.consent) m.push('本轮取得14份知情授权');
     if (!s.flags.power) m.push('本轮恢复稳定配电');
-    if (!(s.flags.relay || s.flags.rescued)) m.push('本轮取用继电器或救下路易');
+    if (!assisted(s)) m.push('本轮取得继电器、路易或船员的配电协助');
     return m;
   }
   function goal(s) {
@@ -53,9 +55,9 @@
     if (!deduced(s, 'missing')) return '在证据板连接运送单与门禁日志，验证失踪原因。';
     if (!has(s, 'records')) return '调查医务室：14份病历与237名乘客有什么关系？';
     if (!deduced(s, 'passengers')) return '把载客名册与保存病历放在一起，核实人数与停机代价。';
-    if (!has(s, 'alibi')) return '在一轮的 00:09 留在甲板，让摄像头记录你的行程。';
+    if (!has(s, 'alibi') && !has(s, 'maintenance') && !deduced(s, 'projection')) return '在00:09留在甲板取得行程，或救下路易询问维护终端的记录。';
     if (!has(s, 'video')) return '回驾驶室查看 00:09 录像。';
-    if (!deduced(s, 'projection')) return '用监控、门禁日志与甲板行程，排除另一个真人的假说。';
+    if (!deduced(s, 'projection')) return '用监控、门禁日志和甲板行程或维护纸带，核实投影的身份。';
     if (!s.flags.power) return '去机舱恢复供电。总量6，控制至少2、保存至少3、照明至少1。';
     if (!has(s, 'ticket')) return '进入隐藏保存舱，查看那张浸湿的登船票。';
     return '已可作出最终决定。额外核实转移方案、艇位与授权，可以尝试全员救援。';
@@ -84,10 +86,30 @@
         if (!D.evidence[id]) return fail('这里没有可记录的新线索。');
         if (id === 'video' && !s.timeline.length) return fail('监控尚未记录到异常。等待一轮的 00:09 后再查看。');
         if (id === 'logs' && s.minute < 7 && !s.timeline.length) return fail('尚未发生封锁。等到 00:07 后复查门禁日志。');
-        if (id === 'records' && !has(s, 'doctor') && !s.flags.locker) return fail('先询问林医生，或解开备用柜取得档案钥匙。');
+        if (id === 'records' && !has(s, 'doctor') && !s.flags.locker && !s.flags.patientLink) return fail('先询问林医生、取得苏禾的帮助，或解开备用柜。');
         if (id === 'transfer' && !has(s, 'records')) return fail('先核实保存病历，再检查这份技术方案。');
         if (id === 'relay') s.flags.relay = true;
         learn(s, id); clue = id; message = D.evidence[id].text; break;
+      }
+      case 'dialogue': {
+        const npc = action.id, choice = Story.getChoice(npc, action.choice);
+        if (!D.rooms[s.room].objects.some(o => o[0] === npc)) return fail('对方不在这里。');
+        if (npc === 'louis' && !s.flags.rescued) return fail('先把路易从维护间救出来，再与他交谈。');
+        if (!choice) return fail('请选择当前对话中的有效回答。');
+        const option = Story.available(s, npc).find(c => c.id === choice.id);
+        if (option.reason) return fail(option.reason);
+        s.choices ||= []; s.story ||= {}; s.relations ||= {};
+        if (choice.slot) { s.choices.push({ cycle: s.cycle, npc, choice: choice.id }); s.choices=s.choices.slice(-200); }
+        const unique = 'dialogue:' + npc + ':' + choice.id;
+        if (!s.rewarded.includes(unique)) {
+          s.relations[npc] = Math.max(-3, Math.min(3, (s.relations[npc] || 0) + (choice.relation || 0)));
+          reward(s, unique, choice.slot ? 10 : 0);
+          if (choice.slot) s.diary.push({ id: unique, text: `你对${Story.people[npc].name}说：“${choice.label}” ${choice.impact}` });
+        }
+        Object.assign(s.flags, choice.flags || {}); Object.assign(s.story, choice.story || {});
+        for (const id of choice.learn || []) learn(s, id);
+        message = choice.reply; record(s, Story.people[npc].name + '：' + choice.impact);
+        return { state: s, ok: true, message, impact: choice.impact, clue: null };
       }
       case 'talk': {
         if (!D.rooms[s.room].objects.some(o => o[0] === action.id && o[4] === 'talk')) return fail('对方不在这里。');
@@ -113,6 +135,7 @@
       }
       case 'rescueLouis': {
         if (s.room !== 'engine') return fail('路易在机舱维护间。');
+        if (s.flags.louisEvac) return fail('路易已前往救生艇，请取用继电器或取得其他船员的协助。');
         if (!has(s, 'route')) return fail('你还不知道维护间里的人是谁。先调查运送单。');
         if (s.minute < 7) return fail('路易尚未进入被封锁的维护间。等到 00:07 后检查。');
         s.flags.rescued = true; reward(s, 'quest:louis', 50); message = '你转动手动阀，路易跌出门外。他答应在本轮留下协助你操作远端开关。';
@@ -122,7 +145,7 @@
       case 'deduce': {
         const ids = [...new Set(Array.isArray(action.ids) ? action.ids : [])].sort();
         if (!ids.every(id => has(s, id))) return fail('只能使用已经取得的证据。');
-        const entry = Object.entries(D.deductions).find(([, d]) => JSON.stringify(d.ids.slice().sort()) === JSON.stringify(ids));
+        const entry = Object.entries(D.deductions).find(([, d]) => [d.ids, ...(d.alternatives || [])].some(set => JSON.stringify(set.slice().sort()) === JSON.stringify(ids)));
         if (!entry) return fail('这些材料还不足以支持一个明确结论。试着让时间、地点或人数相互印证。');
         const [id, d] = entry;
         if (!deduced(s, id)) { s.deductions.push(id); reward(s, 'deduction:' + id, d.xp); }
@@ -132,7 +155,7 @@
         if (s.room !== 'engine') return fail('配电台位于机舱。');
         const p = action.values;
         if (!Array.isArray(p) || p.length !== 3 || !p.every(v => Number.isInteger(v) && v >= 0 && v <= 6)) return fail('输入三条线路的整数供能值。');
-        if (!(s.flags.relay || s.flags.rescued)) return fail('需要先取用工具柜的延时继电器，或救下路易协助操作。');
+        if (!assisted(s)) return fail('需要继电器、路易、船长或纪川提供配电协助。');
         if (p.reduce((a, b) => a + b, 0) > 6) return fail('总供能超过6单位。保护系统已复位，没人因此受伤。');
         if (p[0] < 2 || p[1] < 3 || p[2] < 1) return fail('供能不足：循环控制至少2、保存舱至少3、公共照明至少1。保护系统已复位。');
         s.flags.power = true; reward(s, 'puzzle:power', 30); message = '控制2 · 保存3 · 照明1。供电稳定，保存舱的门灯亮起。'; break;
@@ -170,7 +193,7 @@
       if (!o || o.version !== VERSION || !D.rooms[o.room] || !Number.isInteger(o.minute) || o.minute < 0 || o.minute > 13 || !Number.isInteger(o.cycle) || o.cycle < 1) return null;
       const s = create(o.gender); s.room = o.room; s.minute = o.minute; s.cycle = Math.min(o.cycle, 100000);
       s.known = Array.isArray(o.known) ? [...new Set(o.known.filter(x => typeof x === 'string' && Object.hasOwn(D.evidence, x)))] : [];
-      s.deductions = Array.isArray(o.deductions) ? [...new Set(o.deductions.filter(x => Object.hasOwn(D.deductions, x) && D.deductions[x].ids.every(id => s.known.includes(id))))] : [];
+      s.deductions = Array.isArray(o.deductions) ? [...new Set(o.deductions.filter(x => Object.hasOwn(D.deductions, x) && supportsDeduction(s, D.deductions[x])))] : [];
       s.flags = freshFlags(); for (const k of Object.keys(s.flags)) s.flags[k] = o.flags?.[k] === true;
       s.xp = Number.isSafeInteger(o.xp) && o.xp >= 0 ? Math.min(o.xp, 10000) : 0;
       s.rewarded = Array.isArray(o.rewarded) ? o.rewarded.filter(x => typeof x === 'string').slice(0, 300) : [];
@@ -180,8 +203,13 @@
       s.log = Array.isArray(o.log) ? o.log.filter(x => typeof x === 'string').slice(0, 50).map(x => x.slice(0, 500)) : [];
       s.ending = Object.hasOwn(D.endings, o.ending) ? o.ending : null;
       s.endingsSeen = Array.isArray(o.endingsSeen) ? [...new Set(o.endingsSeen.filter(x => Object.hasOwn(D.endings, x)))] : [];
+      for (const id of Object.keys(Story.people)) if (Number.isInteger(o.relations?.[id])) s.relations[id] = Math.max(-3, Math.min(3, o.relations[id]));
+      s.choices = Array.isArray(o.choices) ? o.choices.filter(c => c && Number.isInteger(c.cycle) && c.cycle > 0 && c.cycle <= s.cycle && Story.getChoice(c.npc, c.choice)?.slot).slice(-200).map(c => ({ cycle: c.cycle, npc: c.npc, choice: c.choice })) : [];
+      if (['truth', 'bluff'].includes(o.story?.qin)) s.story.qin = o.story.qin;
+      if (['full', 'order', 'silent'].includes(o.story?.broadcast)) s.story.broadcast = o.story.broadcast;
+      for (const key of ['careful', 'eileenMusic']) if (typeof o.story?.[key] === 'boolean') s.story[key] = o.story[key];
       return s;
     } catch { return null; }
   }
-  return { create, act, restore, gate, goal, ready, rescueMissing, has, deduced, data: D };
+  return { create, act, restore, gate, goal, ready, rescueMissing, has, deduced, assisted, story: Story, epilogue: Story.epilogue, data: D };
 });
