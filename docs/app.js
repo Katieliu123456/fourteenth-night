@@ -64,7 +64,7 @@
   }
   function ending() {
     const e = D.endings[state.ending];
-    return `<section class="ending-screen fade-in">${brand()}<div class="ending-symbol">XIV</div><div class="eyebrow">${e.en}</div><h1>${e.name}</h1><div class="gold" style="font-size:12px;letter-spacing:3px">${e.saved}</div><p class="ending-copy">${e.text}</p><p class="ending-quote">${e.quote}</p><div class="anchor-reward">记忆锚点已归位 · 浸湿的登船票<small>已恢复记忆 1 / 14 · 历史登船 14 次 · 本次为失忆后的首次访问</small></div><div class="modal-actions"><button class="button" data-action="station">返回夜航中转站 →</button><button class="button secondary" data-action="replay">探索其他结局</button></div><p class="endings-count">本机已发现结局 ${state.endingsSeen.length} / 3 · 你的选择已记入夜航档案</p></section>`;
+    return `<section class="ending-screen fade-in">${brand()}<div class="ending-symbol">XIV</div><div class="eyebrow">${e.en}</div><h1>${e.name}</h1><div class="gold" style="font-size:12px;letter-spacing:3px">${e.saved}</div><p class="ending-copy">${e.text}</p><p class="ending-quote">${e.quote}</p>${G.epilogue(state).length?'<div class="epilogue-notes"><h3>AFTER THIS NIGHT</h3>'+G.epilogue(state).map(line=>'<p>'+esc(line)+'</p>').join('')+'</div>':''}<div class="anchor-reward">记忆锚点已归位 · 浸湿的登船票<small>已恢复记忆 1 / 14 · 历史登船 14 次 · 本次为失忆后的首次访问</small></div><div class="modal-actions"><button class="button" data-action="station">返回夜航中转站 →</button><button class="button secondary" data-action="replay">探索其他结局</button></div><p class="endings-count">本机已发现结局 ${state.endingsSeen.length} / 3 · 你的选择已记入夜航档案</p></section>`;
   }
   function render() {
     const walking = screen === 'game' && state && !state.ending && view === '3d';
@@ -72,7 +72,7 @@
     root.innerHTML = screen === 'landing' || !state ? landing() : state.ending ? ending() : walking ? Night14View.game(state, icon, esc) : game();
     if (screen === 'landing' || !state) {
       root.querySelector('.boarding label').insertAdjacentHTML('beforebegin', Night14View.switcher(view));
-      root.querySelector('.landing-bottom').lastElementChild.textContent = '游轮篇 · 3D 试玩 0.2';
+      root.querySelector('.landing-bottom').lastElementChild.textContent = '游轮篇 · 绘本 3D 试玩 0.3';
     } else if (view === '2d' && !state.ending) root.querySelector('.header-actions').insertAdjacentHTML('afterbegin', '<button class="icon-button" data-action="view" data-view="3d" aria-label="切换3D自由行走">3D</button>');
     window.Night14Walk?.sync(state, !!walking);
     if (!walking) document.getElementById('world3d').hidden = true;
@@ -95,22 +95,21 @@
       if (G.has(state, 'alibi')) showClue('alibi');
       else open('等一束红灯亮起', 'DECK CAMERA', `<p>摄像头会在 <span class="gold">00:09</span> 拍摄连续影像。那一刻，你需要真正站在甲板上。它将成为你不在驾驶室的行程证据。</p>${state.minute < 9 ? '<button class="button" data-action="camera-wait">留在甲板，等待到 00:09 →</button>' : '<p class="modal-note">本轮已错过拍摄。下一轮可以提前来到甲板。</p>'}<button class="button secondary" data-action="close">继续调查</button>`);
     } else if (kind === 'rescue') {
+      if(state.flags.rescued){showPerson('louis');return;}
+      if(state.flags.louisEvac){toast('路易已经前往救生艇，本轮无法继续协助配电。');return;}
       open('门后的敲击', 'LOUIS / MAINTENANCE', `<p class="dialog-quote">${state.minute < 7 ? '“我得先去维护间看看，00:07之前应该能回来。”' : state.flags.rescued ? '“我就在这里。需要时叫我，我帮你操作另一边的开关。”' : '“是我，路易！门突然锁上了，外面有个手动阀——”'}</p><p class="modal-note">救下路易可以获得本轮的配电协助。也可以取用继电器独自完成操作。</p><button class="button" data-action="rescue-louis">转动手动阀</button>`);
     } else if (kind === 'consent') {
       open('先听见他们的声音', 'INFORMED CHOICE', `<p>你准备向十四名保存者说明转移方法、实测艇位，以及循环核心将在桥接后永久损毁的风险。</p><p class="modal-note">需要先调查救生艇与桥接技术卡。授权在本轮生效，循环重置后须重新确认。</p><button class="button" data-action="consent">说明方案，征求他们的同意 →</button>`);
     } else if (kind === 'final') showFinal();
   }
-  function showPerson(id) {
-    const people = { eileen: ['艾琳', '乘客 / REMEMBERS THE LOOP', '“我们见过。你不记得我了，对吗？”', '她看向你的目光中没有惊讶，只有一种难以解释的疲惫。'], doctor: ['林医生', '船医 / THE FOURTEEN', '“请先知道他们是谁，再决定该不该关掉开关。”', '医生把病历推到你面前。十四个人的呼吸，正依靠同一个系统。'], captain: ['霍尔船长', '船长 / KEEP EVERYONE ALIVE', '“没有人能离开，我就不会让这艘船靠岸。”', '他承认自己在保护某些人。但他避开了“是谁下达命令”的问题。'] };
-    const p = people[id];
-    open(p[0], 'CONVERSATION', `<div class="person-name"><div class="portrait">${p[0].slice(0, 1)}</div><div><small>${p[1]}</small><h3>${p[0]}</h3></div></div><p class="dialog-quote">${p[2]}</p><p>${p[3]}</p><div class="line"></div><div class="modal-actions"><button class="button" data-action="talk" data-id="${id}">${id === 'eileen' ? '询问重复发生的夜晚' : id === 'doctor' ? '请解释保存舱病历' : '用已知记录质询船长'}</button>${id === 'eileen' && G.has(state, 'score') ? '<button class="button secondary" data-action="talk-music">把钢琴谱交还给她</button>' : ''}</div>`);
-  }
+  function showPerson(id, result) { const content=Night14Conversations.render(state,id,esc,result); open(content.title,'CONVERSATION / THE THINGS YOU SAY',content.body); modal.className='conversation-modal'; }
+  function showAudio(){open('声音与音乐','YONGYE SOUNDSCAPE',Night14Conversations.audioSettings());modal.className='audio-modal';}
   function showLocker() {
     open('医务室备用柜', 'PUZZLE 01 / THE RELIABLE DATE', `<p>柜门上写着：“请以值班日期的月日为准。”<br>输入四位密码。请让两份有来源的记录互相印证。</p><form id="locker-form"><label for="locker-code" class="eyebrow">MONTH / DAY</label><input id="locker-code" class="locker-input" name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="四位备用柜密码"><p id="puzzle-error" class="inline-error" role="alert"></p><button class="button wide" type="submit">验证日期，打开备用柜</button></form>`);
     document.getElementById('locker-code').focus();
   }
   function showPower() {
-    open('六单位的夜晚', 'PUZZLE 02 / POWER DISTRIBUTION', `<p>可用供能只有 <span class="gold">6 单位</span>。你必须让控制、保存与最低照明同时工作，救生设备使用独立应急电源。</p><form id="power-form">${[['循环控制', 2, 2], ['保存舱', 3, 3], ['公共照明', 1, 2]].map(([name, min, val], i) => `<div class="power-row"><label for="power-${i}">${name}<small>最低需求 ${min} 单位</small></label><input id="power-${i}" name="power-${i}" type="number" min="0" max="6" value="${val}" required></div>`).join('')}<div class="power-total"><span>当前分配</span><span><strong id="power-sum">7</strong> / 6</span></div><p id="puzzle-error" class="inline-error" role="alert"></p><p class="modal-note">${state.flags.rescued ? '路易已在远端待命，可以协助操作。' : state.flags.relay ? '你已取用延时继电器，可以独自操作。' : '先救下路易，或从机舱工具柜取用延时继电器。'}</p><button type="submit" class="button wide">检查并接通线路</button></form>`);
+    open('六单位的夜晚', 'PUZZLE 02 / POWER DISTRIBUTION', `<p>可用供能只有 <span class="gold">6 单位</span>。你必须让控制、保存与最低照明同时工作，救生设备使用独立应急电源。</p><form id="power-form">${[['循环控制', 2, 2], ['保存舱', 3, 3], ['公共照明', 1, 2]].map(([name, min, val], i) => `<div class="power-row"><label for="power-${i}">${name}<small>最低需求 ${min} 单位</small></label><input id="power-${i}" name="power-${i}" type="number" min="0" max="6" value="${val}" required></div>`).join('')}<div class="power-total"><span>当前分配</span><span><strong id="power-sum">7</strong> / 6</span></div><p id="puzzle-error" class="inline-error" role="alert"></p><p class="modal-note">${state.flags.captainSupport ? '霍尔已安排船员在远端协助操作。' : state.flags.radioSupport ? '纪川已接通远端开关，可以协助操作。' : state.flags.rescued ? '路易已在远端待命，可以协助操作。' : state.flags.relay ? '你已取用延时继电器，可以独自操作。' : '先救下路易，或从机舱工具柜取用延时继电器。'}</p><button type="submit" class="button wide">检查并接通线路</button></form>`);
   }
   function showBoard(preserve = false) {
     if (!preserve) selected.clear();
@@ -138,6 +137,10 @@
     if (a === 'close') close();
     else if (a === 'view') { view = b.dataset.view === '2d' ? '2d' : '3d'; try { localStorage.setItem('night14-view', view); } catch {} render(); }
     else if (a === 'walk-play') window.Night14Walk?.play();
+    else if(a==='audio-settings') showAudio();
+    else if(a==='audio-toggle'){Night14Audio.toggle().then(showAudio);}
+    else if(a==='audio-preview'){Night14Audio.preview(b.dataset.surface).then(()=>{const label=document.getElementById('audio-status');if(label)label.textContent=Night14Audio.status();});}
+    else if(a==='dialogue-choice'){const result=dispatch({type:'dialogue',id:b.dataset.id,choice:b.dataset.choice},{quiet:true});if(result.ok)showPerson(b.dataset.id,result);else toast(result.message);}
     else if (a === 'walk-pause') window.Night14Walk?.pause();
     else if (a === 'walk-interact') window.Night14Walk?.interact();
     else if (a === 'walk-lock') { window.Night14Walk?.play(); window.Night14Walk?.lock(); }
@@ -165,7 +168,7 @@
       const id = a === 'talk-music' ? 'eileen' : b.dataset.id;
       const r = dispatch({ type: 'talk', id, choice: a === 'talk-music' ? 'music' : undefined }, { quiet: true });
       if (r.ok) open(id === 'eileen' ? '艾琳的回答' : id === 'doctor' ? '林医生的说明' : '霍尔的回答', 'TESTIMONY', `<p class="dialog-quote">${esc(r.message)}</p><p class="modal-note">有效记录已进入档案，可与实物证据交叉验证。</p><button class="button secondary" data-action="close">记住这些话，继续调查 →</button>`); else toast(r.message);
-    } else if (a === 'rescue-louis') { const r = dispatch({ type: 'rescueLouis' }); if (r.ok) close(); }
+    } else if (a === 'rescue-louis') { const r = dispatch({ type: 'rescueLouis' }); if (r.ok) showPerson('louis'); }
     else if (a === 'consent') { const r = dispatch({ type: 'consent' }, { quiet: true }); if (r.ok) showClue('consent'); else toast(r.message); }
     else if (a === 'board') showBoard();
     else if (a === 'select-clue') { const y = b.dataset.id; if (selected.has(y)) selected.delete(y); else if (selected.size < 3) selected.add(y); else { toast('一次最多连接3份证据。'); return; } const scroll = modal.querySelector('.clue-grid').scrollTop; showBoard(true); modal.querySelector('.clue-grid').scrollTop = scroll; }
@@ -188,7 +191,7 @@
     if (e.target.id === 'locker-form') { e.preventDefault(); const r = dispatch({ type: 'locker', code: new FormData(e.target).get('code') }, { quiet: true }); if (r.ok) { close(); toast(r.message); } else document.getElementById('puzzle-error').textContent = r.message; }
     if (e.target.id === 'power-form') { e.preventDefault(); const f = new FormData(e.target); const values = [0,1,2].map(i => Number(f.get('power-' + i))); const r = dispatch({ type: 'power', values }, { quiet: true }); if (r.ok) { close(); toast(r.message); } else document.getElementById('puzzle-error').textContent = r.message; }
   });
-  document.addEventListener('input', e => { if (e.target.closest('#power-form')) document.getElementById('power-sum').textContent = [0,1,2].reduce((n, i) => n + Number(document.getElementById('power-' + i).value), 0); });
+  document.addEventListener('input', e => { if(e.target.dataset.audioVolume)Night14Audio.setVolume(e.target.dataset.audioVolume,Number(e.target.value)/100); if (e.target.closest('#power-form')) document.getElementById('power-sum').textContent = [0,1,2].reduce((n, i) => n + Number(document.getElementById('power-' + i).value), 0); });
   function showShipMap() { open('永夜号舱室图', 'SHIP DIRECTORY / WORLD 01', Night14View.map(state, esc), true); }
   window.Night14UI = {
     move(room) { if (view === '3d' && screen === 'game') return dispatch({ type: 'move', room }); },
