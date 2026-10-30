@@ -7,13 +7,18 @@
   <meta name="description" content="第十四夜：永不靠岸的游轮。探索永夜号、验证线索，在重复的十四分钟里决定237人的命运。">
   <title>第十四夜 · 永不靠岸的游轮</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
-  <script src="data.js" defer></script>
-  <script src="engine.js" defer></script>
-  <script src="art.js" defer></script>
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="style.css?v=0.2.0">
+  <link rel="stylesheet" href="walk3d.css?v=0.2.0">
+  <script src="data.js?v=0.2.0" defer></script>
+  <script src="engine.js?v=0.2.0" defer></script>
+  <script src="art.js?v=0.2.0" defer></script>
+  <script src="navigation.js?v=0.2.0" defer></script>
+  <script src="ui3d.js?v=0.2.0" defer></script>
+  <script src="app.js?v=0.2.0" defer></script>
+  <script type="module" src="world3d.js?v=0.2.0" onerror="window.dispatchEvent(new Event('night14-3d-failed'))"></script>
 </head>
 <body>
+  <div id="world3d" hidden></div>
   <main id="app"></main>
   <dialog id="modal" aria-labelledby="modal-title"></dialog>
   <div id="toast" role="status" aria-live="polite"></div>

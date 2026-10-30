@@ -3,6 +3,8 @@
   const G = window.Night14, D = G.data, root = document.getElementById('app'), modal = document.getElementById('modal');
   const STORAGE = 'night14-cruise-v1';
   let state = null, gender = 'female', screen = 'landing', selected = new Set(), toastTimer, lastFocus, lastRenderedRoom, lastRenderedScreen;
+  let view = '3d';
+  try { view = localStorage.getItem('night14-view') || '3d'; } catch {}
   let saveAvailable = true;
   try { state = G.restore(localStorage.getItem(STORAGE)); } catch { saveAvailable = false; }
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -65,7 +67,15 @@
     return `<section class="ending-screen fade-in">${brand()}<div class="ending-symbol">XIV</div><div class="eyebrow">${e.en}</div><h1>${e.name}</h1><div class="gold" style="font-size:12px;letter-spacing:3px">${e.saved}</div><p class="ending-copy">${e.text}</p><p class="ending-quote">${e.quote}</p><div class="anchor-reward">记忆锚点已归位 · 浸湿的登船票<small>已恢复记忆 1 / 14 · 历史登船 14 次 · 本次为失忆后的首次访问</small></div><div class="modal-actions"><button class="button" data-action="station">返回夜航中转站 →</button><button class="button secondary" data-action="replay">探索其他结局</button></div><p class="endings-count">本机已发现结局 ${state.endingsSeen.length} / 3 · 你的选择已记入夜航档案</p></section>`;
   }
   function render() {
-    root.innerHTML = screen === 'landing' || !state ? landing() : state.ending ? ending() : game();
+    const walking = screen === 'game' && state && !state.ending && view === '3d';
+    document.body.classList.toggle('walking', !!walking);
+    root.innerHTML = screen === 'landing' || !state ? landing() : state.ending ? ending() : walking ? Night14View.game(state, icon, esc) : game();
+    if (screen === 'landing' || !state) {
+      root.querySelector('.boarding label').insertAdjacentHTML('beforebegin', Night14View.switcher(view));
+      root.querySelector('.landing-bottom').lastElementChild.textContent = '游轮篇 · 3D 试玩 0.2';
+    } else if (view === '2d' && !state.ending) root.querySelector('.header-actions').insertAdjacentHTML('afterbegin', '<button class="icon-button" data-action="view" data-view="3d" aria-label="切换3D自由行走">3D</button>');
+    window.Night14Walk?.sync(state, !!walking);
+    if (!walking) document.getElementById('world3d').hidden = true;
     if (screen !== lastRenderedScreen || state?.room !== lastRenderedRoom) window.scrollTo(0, 0);
     lastRenderedScreen = screen; lastRenderedRoom = state?.room;
   }
@@ -119,17 +129,27 @@
     open('你将如何结束这一夜', 'THE FINAL DECISION', `<p>你已查明这里发生的事。记忆锚点会在执行后读取，无论你选择哪种方案。</p><div class="ending-grid">${Object.entries(D.endings).map(([id, e]) => { const m = id === 'rescue' ? G.rescueMissing(state) : []; return `<button class="ending-option ${m.length ? 'locked' : ''}" data-action="choose-ending" data-ending="${id}"><h3>${e.name}</h3><p class="gold">${e.saved}</p><p>${e.price}</p>${m.length ? `<small>尚需：${m.join('、')}</small>` : '<small style="color:var(--mint)">条件已满足 · 可进入最后确认</small>'}</button>`; }).join('')}</div>`);
   }
   function help() {
-    open('初次夜航须知', 'WELCOME ABOARD', `<p><strong class="gold">探索。</strong>点击场景中的数字标记，或下方物品卡。左侧地图只允许沿相邻路线移动，每次消耗1分钟。</p><p><strong class="gold">验证。</strong>证据板中选择2～3份相互印证的记录，验证失踪、人数与身份三项推论。可以试错，不会扣经验。</p><p><strong class="gold">时间。</strong>时间按行动推进，阅读、对话和思考不走时。“等待”可以跳到事件时间。00:14会重置本轮，线索与推论会保留。</p><p><strong class="gold">再试一次。</strong>错过事件，可以回客舱主动重置。甲板摄像头需要你在00:09亲自在场，其他记录可从档案回看。</p><p><strong class="gold">作出决定。</strong>三项推论与登船票核实后，可决定循环去留。全员救援额外需要艇位、桥接方案、稳定供电和保存者授权。</p><p class="modal-note">本试玩完成游轮篇调查闭环，其他13个世界与正式3D场景尚未制作。进度仅保存在当前浏览器，清理网站数据会删除存档。</p><button class="button" data-action="close">我准备好了 →</button>`);
+    if (view === '3d') { open('3D 自由探索', 'WELCOME ABOARD', Night14View.help); return; }
+    open('初次夜航须知', 'WELCOME ABOARD', `<p><strong class="gold">探索。</strong>点击场景中的数字标记，或下方物品卡。左侧地图只允许沿相邻路线移动，每次消耗1分钟。</p><p><strong class="gold">验证。</strong>证据板中选择2～3份相互印证的记录，验证失踪、人数与身份三项推论。可以试错，不会扣经验。</p><p><strong class="gold">时间。</strong>时间按行动推进，阅读、对话和思考不走时。“等待”可以跳到事件时间。00:14会重置本轮，线索与推论会保留。</p><p><strong class="gold">再试一次。</strong>错过事件，可以回客舱主动重置。甲板摄像头需要你在00:09亲自在场，其他记录可从档案回看。</p><p><strong class="gold">作出决定。</strong>三项推论与登船票核实后，可决定循环去留。全员救援额外需要艇位、桥接方案、稳定供电和保存者授权。</p><p class="modal-note">本试玩完成游轮篇调查闭环，其他13个世界尚未制作；标题页可切换3D自由行走。进度仅保存在当前浏览器，清理网站数据会删除存档。</p><button class="button" data-action="close">我准备好了 →</button>`);
   }
   document.addEventListener('click', e => {
     const b = e.target.closest('button[data-action]'); if (!b) return;
     const a = b.dataset.action;
     if (a === 'close') close();
+    else if (a === 'view') { view = b.dataset.view === '2d' ? '2d' : '3d'; try { localStorage.setItem('night14-view', view); } catch {} render(); }
+    else if (a === 'walk-play') window.Night14Walk?.play();
+    else if (a === 'walk-pause') window.Night14Walk?.pause();
+    else if (a === 'walk-interact') window.Night14Walk?.interact();
+    else if (a === 'walk-lock') { window.Night14Walk?.play(); window.Night14Walk?.lock(); }
+    else if (a === 'walk-flash') window.Night14Walk?.flashlight();
+    else if (a === 'walk-nudge') window.Night14Walk?.nudge(b.dataset.direction);
+    else if (a === 'ship-map') showShipMap();
+    else if (a === 'walk-wait') open('等候一个时刻', 'THE NIGHT MOVES WITH YOUR ACTIONS', '<p>通过舱门推进1分钟。也可以主动等待事件；00:14回到客舱，已知线索保留。</p>' + timeControls());
     else if (a === 'gender') { gender = b.dataset.gender; render(); }
     else if (a === 'start') {
       if (state) open('开始新的夜航', 'NEW JOURNEY', '<p>重新登船会覆盖这台设备的当前存档。你也可以继续原来的调查。</p><button class="button danger" data-action="new-confirm">确认重新登船</button><button class="button secondary" data-action="close">保留原来的进度</button>');
-      else { state = G.create(gender); screen = 'game'; persist(); render(); toast('00:00。先调查桌上的乘船证，再去酒吧找艾琳。'); }
-    } else if (a === 'new-confirm') { close(); state = G.create(gender); screen = 'game'; persist(); render(); }
+      else { window.Night14Walk?.reset(); state = G.create(gender); screen = 'game'; persist(); render(); toast('00:00。先调查桌上的乘船证，再去酒吧找艾琳。'); }
+    } else if (a === 'new-confirm') { close(); window.Night14Walk?.reset(); state = G.create(gender); screen = 'game'; persist(); render(); }
     else if (a === 'continue') { screen = 'game'; render(); }
     else if (a === 'home') { close(); screen = 'landing'; render(); }
     else if (a === 'help') help();
@@ -139,7 +159,7 @@
       if (!D.rooms[state.room].exits.includes(b.dataset.room)) { toast('请沿相邻路线前往。当前可去：' + D.rooms[state.room].exits.map(id => D.rooms[id].name).join('、')); return; }
       dispatch({ type: 'move', room: b.dataset.room });
     } else if (a === 'object') showObject(b.dataset.id);
-    else if (a === 'wait') { const minute = Number(document.getElementById(b.dataset.target).value); dispatch({ type: 'wait', minute }); }
+    else if (a === 'wait') { const minute = Number(document.getElementById(b.dataset.target).value); if (view === '3d') close(); dispatch({ type: 'wait', minute }); }
     else if (a === 'camera-wait') { close(); const r = dispatch({ type: 'wait', minute: 9 }, { quiet: true }); if (r.ok) showClue('alibi'); else toast(r.message); }
     else if (a === 'talk' || a === 'talk-music') {
       const id = a === 'talk-music' ? 'eileen' : b.dataset.id;
@@ -169,5 +189,18 @@
     if (e.target.id === 'power-form') { e.preventDefault(); const f = new FormData(e.target); const values = [0,1,2].map(i => Number(f.get('power-' + i))); const r = dispatch({ type: 'power', values }, { quiet: true }); if (r.ok) { close(); toast(r.message); } else document.getElementById('puzzle-error').textContent = r.message; }
   });
   document.addEventListener('input', e => { if (e.target.closest('#power-form')) document.getElementById('power-sum').textContent = [0,1,2].reduce((n, i) => n + Number(document.getElementById('power-' + i).value), 0); });
+  function showShipMap() { open('永夜号舱室图', 'SHIP DIRECTORY / WORLD 01', Night14View.map(state, esc), true); }
+  window.Night14UI = {
+    move(room) { if (view === '3d' && screen === 'game') return dispatch({ type: 'move', room }); },
+    object(id) { if (view === '3d' && screen === 'game') showObject(id); },
+    board: showBoard, map: showShipMap, notebook: showNotebook, toast,
+    failure(message) { view = '2d'; render(); toast(message); }
+  };
+  window.addEventListener('night14-3d-ready', render);
+  window.addEventListener('night14-3d-failed', () => window.Night14UI.failure('3D引擎未能加载，已为你保留平面调查与存档。'));
+  let holding = false, holdDelay;
+  document.addEventListener('pointerdown', e => { const b = e.target.closest('[data-action="walk-nudge"]'); if (!b || b.dataset.direction.startsWith('turn')) return; holding = true; holdDelay = setTimeout(() => { if (holding) window.Night14Walk?.hold(b.dataset.direction); }, 180); });
+  document.addEventListener('pointerup', () => { holding = false; clearTimeout(holdDelay); window.Night14Walk?.release(); });
+  document.addEventListener('pointercancel', () => { holding = false; clearTimeout(holdDelay); window.Night14Walk?.release(); });
   render();
 })();
